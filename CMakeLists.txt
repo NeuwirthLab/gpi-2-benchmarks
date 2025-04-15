@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(gpi-benchmarks)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 option(WITH_MPI "Compile code such it can run using GPI-2 with MPI support" FALSE)
 
