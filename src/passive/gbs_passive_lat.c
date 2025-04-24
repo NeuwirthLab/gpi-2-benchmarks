@@ -43,7 +43,7 @@ main(int argc, char* argv[])
   {
     if(my_id == 0)
     {
-      fprintf(stderr, "Message size was truncated to %d!\n", max_transfer_size);
+      fprintf(stderr, "Message size was truncated to %ld!\n", max_transfer_size);
     }
     options.max_message_size = max_transfer_size;
   }

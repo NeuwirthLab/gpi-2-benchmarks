@@ -83,7 +83,7 @@ main(int argc, char* argv[])
 
     if(actual_counter_val != expected_counter_val)
     {
-      fprintf(stderr, "Error: expected result is %d but actual result is %d\n",
+      fprintf(stderr, "Error: expected result is %ld but actual result is %ld\n",
               expected_counter_val, actual_counter_val);
       return EXIT_FAILURE;
     }

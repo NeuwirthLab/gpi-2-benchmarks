@@ -35,10 +35,10 @@ main(int argc, char* argv[])
             "segments: %u\nNumber of available Queues: %u\nMaximum number of "
             "simultaneous requests allowed: %u\nMaximum number of allowed "
             "Queues: %u\nMaximum transfet size for a single request: "
-            "%u\nNumber of available notifications: %u\nMaximum transfer size "
-            "per single passive communication request: %u\nMaximum value for "
-            "atomic value: %u\nAllreduce internal user buffer size: "
-            "%u\nMaximum number of elements allowed in gaspi_allreduce: %u\n",
+            "%lu\nNumber of available notifications: %u\nMaximum transfer size "
+            "per single passive communication request: %lu\nMaximum value for "
+            "atomic value: %lu\nAllreduce internal user buffer size: "
+            "%lu\nMaximum number of elements allowed in gaspi_allreduce: %u\n",
             group_max, segment_max, queue_num, queue_size_max, queue_max,
             transfer_size_max, notification_num, passive_transfer_size_max,
             atomic_max_value, allreduce_user_buf_size, allreduce_max_elem);
