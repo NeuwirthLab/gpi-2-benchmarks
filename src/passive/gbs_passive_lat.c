@@ -16,6 +16,7 @@ main(int argc, char* argv[])
   options.type = PASSIVE;
   options.subtype = LAT;
   options.name = "gbs_passive_lat";
+  options.single_buffer = 1;
 
   bo_ret = benchmark_options(argc, argv);
 
@@ -66,59 +67,11 @@ main(int argc, char* argv[])
                           my_id == 0 ? 'a' : 'b');
     GASPI_CHECK(gaspi_segment_ptr(segment_id_a, &ptr_a));
     GASPI_CHECK(gaspi_segment_ptr(segment_id_b, &ptr_b));
-
-    for(size = options.min_message_size; size <= options.max_message_size;
-        size *= 2)
-    {
-      for(i = 0; i < options.iterations + options.skip; ++i)
-      {
-        if(i >= options.skip)
-        {
-          time = Wtime();
-        }
-        if(my_id == 0)
-        {
-          GASPI_CHECK(
-              gaspi_passive_send(segment_id_a, 0, 1, size, GASPI_BLOCK));
-          GASPI_CHECK(gaspi_passive_receive(segment_id_b, 0, &remote_id, size,
-                                            GASPI_BLOCK));
-        }
-        else if(my_id == 1)
-        {
-          GASPI_CHECK(gaspi_passive_receive(segment_id_a, 0, &remote_id, size,
-                                            GASPI_BLOCK));
-          GASPI_CHECK(
-              gaspi_passive_send(segment_id_b, 0, 0, size, GASPI_BLOCK));
-        }
-        if(i >= options.skip)
-        {
-          measurements.time[i - options.skip] = Wtime() - time;
-          measurements.time[i - options.skip] /=
-              2.0; // send-receive special case
-        }
-      }
-      if(options.verify)
-      {
-        const gaspi_pointer_t ptr = my_id == 0 ? ptr_b : ptr_a;
-        const char check_val = my_id == 0 ? 'b' : 'a';
-        for(i = 0; i < size; ++i)
-        {
-          if(((char*)ptr)[i] != check_val)
-          {
-            fprintf(stderr, "Verification failed. Result is invalid!\n");
-            return EXIT_FAILURE;
-          }
-        }
-      }
-      print_result(my_id, measurements, size);
-    }
-    free_gaspi_memory(segment_id_a);
-    free_gaspi_memory(segment_id_b);
   }
-  else
+  for(size = options.min_message_size; size <= options.max_message_size;
+      size *= 2)
   {
-    for(size = options.min_message_size; size <= options.max_message_size;
-        size *= 2)
+    if(!options.single_buffer)
     {
       allocate_gaspi_memory(segment_id_a, size * sizeof(char),
                             my_id == 0 ? 'a' : 'b');
@@ -126,48 +79,58 @@ main(int argc, char* argv[])
                             my_id == 0 ? 'a' : 'b');
       GASPI_CHECK(gaspi_segment_ptr(segment_id_a, &ptr_a));
       GASPI_CHECK(gaspi_segment_ptr(segment_id_b, &ptr_b));
-      for(i = 0; i < options.iterations + options.skip; ++i)
+    }
+    for(i = 0; i < options.iterations + options.skip; ++i)
+    {
+      if(i >= options.skip)
       {
-        if(i >= options.skip)
+        time = Wtime();
+      }
+      if(my_id == 0)
+      {
+        GASPI_CHECK(
+            gaspi_passive_send(segment_id_a, 0, 1, size, GASPI_BLOCK));
+        GASPI_CHECK(gaspi_passive_receive(segment_id_b, 0, &remote_id, size,
+                                          GASPI_BLOCK));
+      }
+      else if(my_id == 1)
+      {
+        GASPI_CHECK(gaspi_passive_receive(segment_id_a, 0, &remote_id, size,
+                                          GASPI_BLOCK));
+        GASPI_CHECK(
+            gaspi_passive_send(segment_id_b, 0, 0, size, GASPI_BLOCK));
+      }
+      if(i >= options.skip)
+      {
+        measurements.time[i - options.skip] = Wtime() - time;
+        measurements.time[i - options.skip] /=
+            2.0; // send-receive special case
+      }
+    }
+    if(options.verify)
+    {
+      const gaspi_pointer_t ptr = my_id == 0 ? ptr_b : ptr_a;
+      const char check_val = my_id == 0 ? 'b' : 'a';
+      for(i = 0; i < size; ++i)
+      {
+        if(((char*)ptr)[i] != check_val)
         {
-          time = Wtime();
-        }
-        if(my_id == 0)
-        {
-          GASPI_CHECK(
-              gaspi_passive_send(segment_id_a, 0, 1, size, GASPI_BLOCK));
-          GASPI_CHECK(gaspi_passive_receive(segment_id_b, 0, &remote_id, size,
-                                            GASPI_BLOCK));
-        }
-        else if(my_id == 1)
-        {
-          GASPI_CHECK(gaspi_passive_receive(segment_id_a, 0, &remote_id, size,
-                                            GASPI_BLOCK));
-          GASPI_CHECK(
-              gaspi_passive_send(segment_id_b, 0, 0, size, GASPI_BLOCK));
-        }
-        if(i >= options.skip)
-        {
-          measurements.time[i - options.skip] = Wtime() - time;
+          fprintf(stderr, "Verification failed. Result is invalid!\n");
+          return EXIT_FAILURE;
         }
       }
-      if(options.verify)
-      {
-        const gaspi_pointer_t ptr = my_id == 0 ? ptr_b : ptr_a;
-        const char check_val = my_id == 0 ? 'b' : 'a';
-        for(i = 0; i < size; ++i)
-        {
-          if(((char*)ptr)[i] != check_val)
-          {
-            fprintf(stderr, "Verification failed. Result is invalid!\n");
-            return EXIT_FAILURE;
-          }
-        }
-      }
-      print_result(my_id, measurements, size);
+    }
+    print_result(my_id, measurements, size);
+    if(!options.single_buffer)
+    {
       free_gaspi_memory(segment_id_a);
       free_gaspi_memory(segment_id_b);
     }
+  }
+  if(options.single_buffer)
+  {
+    free_gaspi_memory(segment_id_a);
+    free_gaspi_memory(segment_id_b);
   }
   free(measurements.time);
   finalize_comm_library();
