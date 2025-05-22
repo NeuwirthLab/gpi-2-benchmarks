@@ -17,21 +17,28 @@ main(int argc, char* argv[])
   options.type = ONESIDED;
   options.subtype = BW;
   options.name = "gbs_write_bibw";
-  options.single_buffer = 1;
 
   bo_ret = benchmark_options(argc, argv);
+
+  init_comm_library(&my_id, &num_pes);
 
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
-    print_bad_usage();
+    if (my_id == 0)
+    {
+      print_bad_usage();
+      print_help_message();
+    }
     return EXIT_FAILURE;
   case OPTIONS_HELP:
-    print_help_message();
+    if (my_id == 0)
+    {
+      print_help_message();
+    }
     return EXIT_SUCCESS;
   }
 
-  init_comm_library(&my_id, &num_pes);
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -122,7 +129,7 @@ main(int argc, char* argv[])
     if(options.verify)
     {
       check_val = my_id == 0 ? 'b' : 'a';
-      for(i = 0; i < size * window_size; ++i)
+      for(i = 0; i < options.single_buffer ? size : size * window_size; ++i)
       {
         if(((char*)ptr)[i] != check_val)
         {

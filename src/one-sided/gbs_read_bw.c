@@ -16,21 +16,28 @@ main(int argc, char* argv[])
   options.type = ONESIDED;
   options.subtype = BW;
   options.name = "gbs_read_bw";
-  //options.verify = 1;
-
+  
   bo_ret = benchmark_options(argc, argv);
+
+  init_comm_library(&my_id, &num_pes);
 
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
-    print_bad_usage();
+    if (my_id == 0)
+    {
+      print_bad_usage();
+      print_help_message();
+    }
     return EXIT_FAILURE;
   case OPTIONS_HELP:
-    print_help_message();
+    if (my_id == 0)
+    {
+      print_help_message();
+    }
     return EXIT_SUCCESS;
   }
 
-  init_comm_library(&my_id, &num_pes);
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -56,7 +63,9 @@ main(int argc, char* argv[])
                               options.max_message_size * sizeof(char),
                               my_id == 0 ? 'a' : 'b');
     GASPI_CHECK(gaspi_segment_ptr(segment_id, &ptr));
+
   }
+
   for(size = options.min_message_size; size <= options.max_message_size;
       size *= 2)
   {
@@ -88,13 +97,14 @@ main(int argc, char* argv[])
       }
       if(options.verify)
       {
-        
-        for (int i = 0; i < size; ++i) {
-            if (((char*)ptr)[i] != 'b') {
-              return EXIT_FAILURE;
-            }
+        for(i = 0; i < size * window_size; ++i)
+        {
+          if(((char*)ptr)[i] != 'b')
+          {
+            fprintf(stderr, "Verification failed. Result is invalid!\n");
+            return EXIT_FAILURE;
+          }
         }
-
       }
     }
     print_result(my_id, measurements, size);
