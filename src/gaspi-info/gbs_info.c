@@ -34,7 +34,7 @@ main(int argc, char* argv[])
             "Maximum number of groups: %u\nMaximum number of permissible "
             "segments: %u\nNumber of available Queues: %u\nMaximum number of "
             "simultaneous requests allowed: %u\nMaximum number of allowed "
-            "Queues: %u\nMaximum transfet size for a single request: "
+            "Queues: %u\nMaximum transfer size for a single request: "
             "%lu\nNumber of available notifications: %u\nMaximum transfer size "
             "per single passive communication request: %lu\nMaximum value for "
             "atomic value: %lu\nAllreduce internal user buffer size: "
@@ -46,19 +46,19 @@ main(int argc, char* argv[])
     switch(network)
     {
     case 0:
-      fprintf(stdout, "GASBPI_IB\n");
+      fprintf(stdout, "GASPI_IB\n");
       break;
     case 1:
-      fprintf(stdout, "GASBPI_ROCE\n");
+      fprintf(stdout, "GASPI_ROCE\n");
       break;
     case 2:
-      fprintf(stdout, "GASBPI_ETHERNET\n");
+      fprintf(stdout, "GASPI_ETHERNET\n");
       break;
     case 3:
-      fprintf(stdout, "GASBPI_GEMINI\n");
+      fprintf(stdout, "GASPI_GEMINI\n");
       break;
     case 4:
-      fprintf(stdout, "GASBPI_ARIES\n");
+      fprintf(stdout, "GASPI_ARIES\n");
       break;
     default:
       fprintf(stdout, "Unknown Network Type!\n");

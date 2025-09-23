@@ -50,7 +50,6 @@ main(int argc, char* argv[])
   measurements.n = options.iterations;
 
   const gaspi_segment_id_t segment_id = 0;
-  const int NUM_THREADS = options.num_threads;
   
   gaspi_pointer_t ptr;
   void (*allocate_benchmark_memory)(const gaspi_segment_id_t, const size_t,
@@ -86,10 +85,9 @@ main(int argc, char* argv[])
         {
           time = Wtime();
         }
-        #pragma omp parallel num_threads(NUM_THREADS)
+        #pragma omp parallel num_threads(options.num_threads)
         {
           gaspi_queue_id_t q_id = omp_get_thread_num();
-          #pragma omp parallel for num_threads(NUM_THREADS)
           for(j = 0; j < window_size; ++j)
           {
 

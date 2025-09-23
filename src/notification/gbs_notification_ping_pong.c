@@ -7,7 +7,6 @@ int
 main(int argc, char* argv[])
 {
   gaspi_rank_t my_id, num_pes;
-  int i;
   int bo_ret = OPTIONS_OKAY;
   double time;
   struct measurements_t measurements;
@@ -54,11 +53,11 @@ main(int argc, char* argv[])
   print_header(my_id);
 
   allocate_gaspi_memory(segment_id, sizeof(char), 'a');
-  for(i = 0; i < options.iterations + options.skip; ++i)
+  for(notification_id = 0; notification_id < options.iterations + options.skip; ++notification_id)
   {
     if(my_id == 0)
     {
-      if(i >= options.skip)
+      if(notification_id >= options.skip)
       {
         time = Wtime();
       }
@@ -66,9 +65,9 @@ main(int argc, char* argv[])
           gaspi_notify(segment_id, 1, notification_id, notification_val, q_id, GASPI_BLOCK));
       GASPI_CHECK(gaspi_notify_waitsome(segment_id, notification_id, 1, &notification_id,
                                         GASPI_BLOCK));
-      if(i >= options.skip)
+      if(notification_id >= options.skip)
       {
-        measurements.time[i - options.skip] = Wtime() - time;
+        measurements.time[notification_id - options.skip] = Wtime() - time;
       }
     }
     else
@@ -78,6 +77,8 @@ main(int argc, char* argv[])
       GASPI_CHECK(gaspi_notify(segment_id, 0, notification_id, notification_val, q_id, GASPI_BLOCK));
     }
     GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
+    GASPI_CHECK(gaspi_notify_reset(segment_id, notification_id, &notification_val));
+
   }
   print_notify_lat(my_id, measurements);
   free_gaspi_memory(segment_id);

@@ -55,12 +55,12 @@ benchmark_options(int argc, char* argv[])
       {"max-message-size", required_argument, 0, 'e'},
       {"iterations", required_argument, 0, 'i'},
       {"csv", no_argument, 0, 0},
-      {"raw_csv", no_argument, 0, 1},
+      {"raw-csv", no_argument, 0, 1},
       {"verify", no_argument, 0, 'v'},
       {"single-buffer", no_argument, 0, 'b'},
-      {"timer", required_argument, 0, 't'},
       {"pin", no_argument, 0, 'p'},
-      {"warmup-iterations", required_argument, 0, 'u'}};
+      {"warmup-iterations", required_argument, 0, 'u'},
+      {"num-threads", required_argument, 0, 'n'}};
 
   int option_index = 0;
   int c;
@@ -68,33 +68,30 @@ benchmark_options(int argc, char* argv[])
 
   if(options.type == PASSIVE)
   {
-    optstring = "hi:w:s:e:u:vbt:";
+    optstring = "hi:w:s:e:u:vb";
   }
   else if(options.type == ONESIDED)
   {
-    optstring = "hi:w:s:e:u:vbt:p";
+    optstring = "hi:w:s:e:u:vbp";
   }
   else if(options.type == ATOMIC)
   {
-    optstring = "hi:u:vt:";
+    optstring = "hi:u:v";
   }
   else if(options.type == COLLECTIVE)
   {
     if(options.subtype == ALLREDUCE)
     {
-      optstring = "hi:w:s:e:u:vbt:";
+      optstring = "hi:w:s:e:u:vb";
     }
     else if(options.subtype == BARRIER)
     {
-      optstring = "hi:u:t:";
+      optstring = "hi:u:";
     }
   }
   else if(options.type == NOTIFY)
   {
-    if(options.subtype == RATE)
-      optstring = "hi:u:w:t:";
-    else
-      optstring = "hi:u:t:";
+    optstring = "hi:u:";
   }
 
   // set default values
@@ -110,16 +107,13 @@ benchmark_options(int argc, char* argv[])
   {
     options.max_message_size = DEFAULT_ALLREDUCE_MAX_MESSAGE_SIZE;
   }
-  else
-  {
-    options.max_message_size = DEFAULT_MAX_MESSAGE_SIZE;
-  }
+
   options.skip = DEFAULT_WARMUP_ITERATIONS;
   options.format = PLAIN;
   options.verify = 0;
   options.single_buffer = 0;
   options.memory_mode = "multiple_buffer";
-  options.gaspi_timer = 0;
+  options.num_threads = 8;
 
   while(1)
   {
@@ -155,14 +149,14 @@ benchmark_options(int argc, char* argv[])
       options.single_buffer = 1;
       options.memory_mode = "single_buffer";
       break;
-    case 't':
-      options.gaspi_timer = atoi(optarg);
-      break;
     case 'u':
       options.skip = atoi(optarg);
       break;
     case 'p':
       options.pin_memory = 1;
+      break;
+    case 'n':
+      options.num_threads = atoi(optarg);
       break;
     default:
       bad_usage.message = "Invalid option";
@@ -191,11 +185,11 @@ print_help_message()
   if(options.subtype != BARRIER && options.type != ATOMIC &&
      options.type != NOTIFY)
   {
-    fprintf(stdout, "\t -w [--window_size] arg\tNumber of messages sent per "
+    fprintf(stdout, "\t -w [--window-size] arg\t Number of messages sent per "
                     "iteration. Default 64.\n");
-    fprintf(stdout, "\t -s [--min_message_size] arg\t Minimum message size. "
+    fprintf(stdout, "\t -s [--min-message-size] arg\t Minimum message size. "
                     "Default 1 byte.\n");
-    fprintf(stdout, "\t -e [--max_message_size] arg\t Maximum message size. "
+    fprintf(stdout, "\t -e [--max-message-size] arg\t Maximum message size. "
                     "Default (1 << 22) byte.\n");
     if(options.subtype != LAT)
     {
@@ -205,7 +199,7 @@ print_help_message()
   }
   else if(options.type == NOTIFY && options.subtype == RATE)
   {
-    fprintf(stdout, "\t -w [--window_size] arg\tNumber of messages sent per "
+    fprintf(stdout, "\t -w [--window-size] arg\tNumber of messages sent per "
                     "iteration. Default 64.\n");
   }
   if(options.subtype != BARRIER && options.subtype != NOTIFY)
@@ -220,10 +214,7 @@ print_help_message()
           "Default 10.\n");
   fprintf(stdout, "\t --csv\tPrint output in csv format with statistics.\n");
   fprintf(stdout,
-          "\t --raw_csv\tPrint the collected raw data without statistics.\n");
-  fprintf(stdout,
-          "\t -t [--timer] arg\t 0: clock_gettime | 1: gaspi_time_get | 2: "
-          "gaspi_time_ticks.\n");
+          "\t --raw-csv\tPrint the collected raw data without statistics.\n");
   fprintf(stdout, "\n\n");
   fflush(stdout);
 }
@@ -237,15 +228,21 @@ print_header(const gaspi_rank_t id)
     {
       if(options.format == PLAIN)
       {
-        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s\n", 10, "#iterations",
-                FIELD_WIDTH, "min_lat", FIELD_WIDTH, "max_lat", FIELD_WIDTH,
-                "avg_lat", FIELD_WIDTH, "median_lat", FIELD_WIDTH, "var_lat",
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "#iterations",
+                FIELD_WIDTH, "min_lat", 
+                FIELD_WIDTH, "max_lat", 
+                FIELD_WIDTH, "avg_lat", 
+                FIELD_WIDTH, "first_qartil_lat",
+                FIELD_WIDTH, "median_lat",
+                FIELD_WIDTH, "third_qartil_lat",
+                FIELD_WIDTH, "var_lat",
                 FIELD_WIDTH, "std_lat");
       }
       else if(options.format == CSV)
       {
-        fprintf(stdout, "#iterations,min_lat,max_lat,avg_lat,median_"
-                        "lat,var_lat,"
+        fprintf(stdout, "#iterations,min_lat,max_lat,avg_lat,first_qartil,median_"
+                        "lat,third_qartil,var_lat,"
                         "std_lat\n");
       }
       else if(options.format == RAW_CSV)
@@ -255,54 +252,46 @@ print_header(const gaspi_rank_t id)
     }
     else if(options.type == NOTIFY)
     {
-      if(options.subtype == RATE)
+      if(options.format == PLAIN)
       {
-        if(options.format == PLAIN)
-        {
-          fprintf(stdout, "%-*s%*s%*s%*s%*s%*s\n", 10, "min_rate", FIELD_WIDTH,
-                  "max_rate", FIELD_WIDTH, "avg_rate", FIELD_WIDTH,
-                  "median_rate", FIELD_WIDTH, "var_rate", FIELD_WIDTH,
-                  "std_rate");
-        }
-        else if(options.format == CSV)
-        {
-          fprintf(stdout, "min_rate,max_rate,avg_"
-                          "rate,median_rate,var_rate,std_rate\n");
-        }
-        else if(options.format == RAW_CSV)
-        {
-          fprintf(stdout, "count,lat\n");
-        }
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "min_lat", 
+                FIELD_WIDTH, "max_lat", 
+                FIELD_WIDTH, "avg_lat", 
+                FIELD_WIDTH, "first_qartil_lat",
+                FIELD_WIDTH, "median_lat",
+                FIELD_WIDTH, "third_qartil_lat",
+                FIELD_WIDTH, "var_lat", 
+                FIELD_WIDTH, "std_lat");
       }
-      else if(options.subtype == PINGPONG)
+      else if(options.format == CSV)
       {
-        if(options.format == PLAIN)
-        {
-          fprintf(stdout, "%-*s%*s%*s%*s%*s%*s\n", 10, "min_lat", FIELD_WIDTH,
-                  "max_lat", FIELD_WIDTH, "avg_lat", FIELD_WIDTH, "median_lat",
-                  FIELD_WIDTH, "var_lat", FIELD_WIDTH, "std_lat");
-        }
-        else if(options.format == CSV)
-        {
-          fprintf(stdout, "min_lat,max_lat,avg_"
-                          "lat,median_lat,var_lat,std_lat\n");
-        }
-        else if(options.format == RAW_CSV)
-        {
-          fprintf(stdout, "count,lat\n");
-        }
+        fprintf(stdout, "min_lat,max_lat,avg_"
+                        "lat,first_qartil,median_lat,third_qartil,var_lat,std_lat\n");
       }
+      else if(options.format == RAW_CSV)
+      {
+        fprintf(stdout, "count,lat\n");
+      }
+      
     }
     else if(options.subtype == LAT)
     {
       if(options.format == PLAIN)
-        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s\n", 10, "memory_mode",
-                FIELD_WIDTH, "msg_size", FIELD_WIDTH, "min_lat", FIELD_WIDTH,
-                "max_lat", FIELD_WIDTH, "avg_lat", FIELD_WIDTH, "median_lat",
-                FIELD_WIDTH, "var_lat", FIELD_WIDTH, "std_lat");
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "memory_mode",
+                FIELD_WIDTH, "msg_size", 
+                FIELD_WIDTH, "min_lat", 
+                FIELD_WIDTH, "max_lat", 
+                FIELD_WIDTH, "avg_lat", 
+                FIELD_WIDTH, "first_qartil_lat",
+                FIELD_WIDTH, "median_lat",
+                FIELD_WIDTH, "third_qartil_lat",
+                FIELD_WIDTH, "var_lat", 
+                FIELD_WIDTH, "std_lat");
       else if(options.format == CSV)
-        fprintf(stdout, "memory_mode,msg_size,min_lat,max_lat,avg_lat,median_"
-                        "lat,var_lat,"
+        fprintf(stdout, "memory_mode,msg_size,min_lat,max_lat,avg_lat,first_qartil,median_lat"
+                        "third_qartil,var_lat,"
                         "std_lat\n");
       else if(options.format == RAW_CSV)
       {
@@ -312,13 +301,20 @@ print_header(const gaspi_rank_t id)
     else if(options.subtype == BW)
     {
       if(options.format == PLAIN)
-        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s\n", 10, "memory_mode",
-                FIELD_WIDTH, "msg_size", FIELD_WIDTH, "min_bw", FIELD_WIDTH,
-                "max_bw", FIELD_WIDTH, "avg_bw", FIELD_WIDTH, "median_bw",
-                FIELD_WIDTH, "var_bw", FIELD_WIDTH, "std_bw");
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "memory_mode",
+                FIELD_WIDTH, "msg_size", 
+                FIELD_WIDTH, "min_bw", 
+                FIELD_WIDTH, "max_bw", 
+                FIELD_WIDTH, "avg_bw", 
+                FIELD_WIDTH, "first_quartil_bw",
+                FIELD_WIDTH, "median_bw",
+                FIELD_WIDTH, "third_quartil_bw",
+                FIELD_WIDTH, "var_bw", 
+                FIELD_WIDTH, "std_bw");
       else if(options.format == CSV)
-        fprintf(stdout, "memory_mode,msg_size,min_bw,max_bw,avg_bw,median_bw,"
-                        "var_bw,std_bw\n");
+        fprintf(stdout, "memory_mode,msg_size,min_bw,max_bw,avg_bw,first_quartil,median_bw,"
+                        "third_quartil,var_bw,std_bw\n");
       else if(options.format == RAW_CSV)
       {
         fprintf(stdout, "msg_size,count,bw\n");
@@ -327,9 +323,13 @@ print_header(const gaspi_rank_t id)
     else if(options.subtype == ALLREDUCE)
     {
       if(options.format == PLAIN)
-        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s\n", 10, "memory_mode",
-                FIELD_WIDTH, "#elements", FIELD_WIDTH, "#ranks", FIELD_WIDTH,
-                "#iterations", FIELD_WIDTH, "min_lat", FIELD_WIDTH, "max_lat",
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "memory_mode",
+                FIELD_WIDTH, "#elements", 
+                FIELD_WIDTH, "#ranks", 
+                FIELD_WIDTH, "#iterations", 
+                FIELD_WIDTH, "min_lat", 
+                FIELD_WIDTH, "max_lat",
                 FIELD_WIDTH, "avg_lat");
       else if(options.format == CSV)
         fprintf(stdout, "memory_mode,elements,ranks,iterations,min_lat,max_lat,"
@@ -338,8 +338,11 @@ print_header(const gaspi_rank_t id)
     else if(options.subtype == BARRIER)
     {
       if(options.format == PLAIN)
-        fprintf(stdout, "%-*s%*s%*s%*s%*s\n", 10, "#ranks", FIELD_WIDTH,
-                "#iterations", FIELD_WIDTH, "min_lat", FIELD_WIDTH, "max_lat",
+        fprintf(stdout, "%-*s%*s%*s%*s%*s\n", 
+                10, "#ranks", 
+                FIELD_WIDTH, "#iterations", 
+                FIELD_WIDTH, "min_lat", 
+                FIELD_WIDTH, "max_lat",
                 FIELD_WIDTH, "avg_lat");
       else if(options.format == CSV)
         fprintf(stdout, "ranks,iterations,min_lat,max_lat,avg_lat\n");
@@ -347,13 +350,20 @@ print_header(const gaspi_rank_t id)
     else if(options.subtype == STRIDED)
     {
       if(options.format == PLAIN)
-        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s\n", 10, "#segments",
-                FIELD_WIDTH, "#iterations", FIELD_WIDTH, "min_lat", FIELD_WIDTH,
-                "max_lat", FIELD_WIDTH, "avg_lat", FIELD_WIDTH, "median_lat",
-                FIELD_WIDTH, "var_lat", FIELD_WIDTH, "std_lat");
+        fprintf(stdout, "%-*s%*s%*s%*s%*s%*s%*s%*s%*s%*s\n", 
+                10, "#segments",
+                FIELD_WIDTH, "#iterations", 
+                FIELD_WIDTH, "min_lat", 
+                FIELD_WIDTH, "max_lat", 
+                FIELD_WIDTH, "avg_lat", 
+                FIELD_WIDTH, "first_qartil_lat",
+                FIELD_WIDTH, "median_lat",
+                FIELD_WIDTH, "third_qartil_lat",
+                FIELD_WIDTH, "var_lat", 
+                FIELD_WIDTH, "std_lat");
       else if(options.format == CSV)
-        fprintf(stdout, "#segments,#iterations,min_lat,max_lat,avg_lat,median_"
-                        "lat,var_lat,std_lat\n");
+        fprintf(stdout, "#segments,#iterations,min_lat,max_lat,avg_lat,first_qartil,median_lat"
+                        "third_quartil,var_lat,std_lat\n");
     }
     fflush(stdout);
   }
@@ -411,8 +421,9 @@ compute_statistics(struct measurements_t measurements,
   }
 
   statistics->avg = sum / n;
+  statistics->first_quartil = t[n / 4];
   statistics->median = t[n / 2];
-
+  statistics->third_quartil = t[n * 3 / 4];
   sum = 0;
 
   for(i = 0; i < n; ++i)
@@ -422,6 +433,7 @@ compute_statistics(struct measurements_t measurements,
 
   statistics->var = sum / n;
   statistics->std = sqrt(statistics->var);
+  
 }
 
 void
@@ -437,27 +449,37 @@ print_result(const gaspi_rank_t id, struct measurements_t measurements,
     compute_statistics(measurements, &statistics, bytes);
     if(options.format == PLAIN)
     {
-      fprintf(stdout, "%-*s%*d%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 10,
-              options.memory_mode, FIELD_WIDTH, size, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.min, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.max, FIELD_WIDTH, FLOAT_PRECISION, statistics.avg,
-              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.var, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.std);
+      fprintf(stdout, "%-*s%*ld%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 
+              10, options.memory_mode, 
+              FIELD_WIDTH, size, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.min, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.max, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.avg,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.first_quartil,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.third_quartil,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.var, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == CSV)
     {
-      fprintf(stdout, "%s,%d,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n",
-              options.memory_mode, size, FLOAT_PRECISION, statistics.min,
-              FLOAT_PRECISION, statistics.max, FLOAT_PRECISION, statistics.avg,
-              FLOAT_PRECISION, statistics.median, FLOAT_PRECISION,
-              statistics.std, FLOAT_PRECISION, statistics.var);
+      fprintf(stdout, "%s,%ld,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n",
+              options.memory_mode, 
+              size,
+              FLOAT_PRECISION, statistics.min,
+              FLOAT_PRECISION, statistics.max, 
+              FLOAT_PRECISION, statistics.avg,
+              FLOAT_PRECISION, statistics.first_quartil, 
+              FLOAT_PRECISION, statistics.median, 
+              FLOAT_PRECISION, statistics.third_quartil, 
+              FLOAT_PRECISION, statistics.std, 
+              FLOAT_PRECISION, statistics.var);
     }
     else if(options.format == RAW_CSV)
     {
       for(i = 0; i < measurements.n; ++i)
       {
-        fprintf(stdout, "%d,%d,%.*f\n", size, i, FLOAT_PRECISION,
+        fprintf(stdout, "%ld,%d,%.*f\n", size, i, FLOAT_PRECISION,
                 measurements.time[i]);
       }
     }
@@ -498,7 +520,7 @@ print_allreduce_result(const gaspi_rank_t id, const int num_pes,
   {
     if(options.format == PLAIN)
     {
-      fprintf(stdout, "%-*s%*d%*d%*d%*.*f%*.*f%*.*f\n", 10, options.memory_mode,
+      fprintf(stdout, "%-*s%*ld%*d%*d%*.*f%*.*f%*.*f\n", 10, options.memory_mode,
               FIELD_WIDTH, size, FIELD_WIDTH, num_pes, FIELD_WIDTH,
               options.iterations, FIELD_WIDTH, FLOAT_PRECISION, min_time,
               FIELD_WIDTH, FLOAT_PRECISION, max_time, FIELD_WIDTH,
@@ -506,7 +528,7 @@ print_allreduce_result(const gaspi_rank_t id, const int num_pes,
     }
     else if(options.format == CSV)
     {
-      fprintf(stdout, "%s,%d,%d,%d,%.*f,%.*f,%.*f\n", options.memory_mode, size,
+      fprintf(stdout, "%s,%ld,%d,%d,%.*f,%.*f,%.*f\n", options.memory_mode, size,
               num_pes, options.iterations, FLOAT_PRECISION, min_time,
               FLOAT_PRECISION, max_time, FLOAT_PRECISION, avg_time);
     }
@@ -524,21 +546,30 @@ print_list_lat(const gaspi_rank_t id, const size_t stride_count,
     compute_statistics(measurements, &statistics, 0);
     if(options.format == PLAIN)
     {
-      fprintf(stdout, "%-*d%*d%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 10,
-              stride_count, FIELD_WIDTH, options.iterations, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.min, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.max, FIELD_WIDTH, FLOAT_PRECISION, statistics.avg,
-              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.var, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.std);
+      fprintf(stdout, "%-*ld%*d%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 
+              10, stride_count, 
+              FIELD_WIDTH, options.iterations, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.min, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.max, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.avg,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.first_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.third_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.var, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == CSV)
     {
-      fprintf(stdout, "%d,%d,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", stride_count,
-              options.iterations, FLOAT_PRECISION, statistics.min,
-              FLOAT_PRECISION, statistics.max, FLOAT_PRECISION, statistics.avg,
-              FLOAT_PRECISION, statistics.median, FLOAT_PRECISION,
-              statistics.var, FLOAT_PRECISION, statistics.std);
+      fprintf(stdout, "%ld,%d,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", 
+              stride_count, options.iterations, 
+              FLOAT_PRECISION, statistics.min,
+              FLOAT_PRECISION, statistics.max, 
+              FLOAT_PRECISION, statistics.avg,
+              FLOAT_PRECISION, statistics.first_quartil, 
+              FLOAT_PRECISION, statistics.median, 
+              FLOAT_PRECISION, statistics.third_quartil, 
+              FLOAT_PRECISION, statistics.var, 
+              FLOAT_PRECISION, statistics.std);
     }
     fflush(stdout);
   }
@@ -554,18 +585,27 @@ print_notify_lat(const gaspi_rank_t id, struct measurements_t measurements)
     compute_statistics(measurements, &statistics, 0);
     if(options.format == PLAIN)
     {
-      fprintf(stdout, "%-*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 10, FLOAT_PRECISION,
-              statistics.min, FIELD_WIDTH, FLOAT_PRECISION, statistics.max,
-              FIELD_WIDTH, FLOAT_PRECISION, statistics.avg, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.median, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.var, FIELD_WIDTH, FLOAT_PRECISION, statistics.std);
+      fprintf(stdout, "%-*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 10, 
+              FLOAT_PRECISION, statistics.min, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.max,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.avg, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.first_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.third_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.var, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == CSV)
     {
-      fprintf(stdout, "%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", FLOAT_PRECISION,
-              statistics.min, FLOAT_PRECISION, statistics.max, FLOAT_PRECISION,
-              statistics.avg, FLOAT_PRECISION, statistics.median,
-              FLOAT_PRECISION, statistics.var, FLOAT_PRECISION, statistics.std);
+      fprintf(stdout, "%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", 
+              FLOAT_PRECISION, statistics.min, 
+              FLOAT_PRECISION, statistics.max, 
+              FLOAT_PRECISION, statistics.avg, 
+              FLOAT_PRECISION, statistics.first_quartil,
+              FLOAT_PRECISION, statistics.median,
+              FLOAT_PRECISION, statistics.third_quartil,
+              FLOAT_PRECISION, statistics.var, 
+              FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == RAW_CSV)
     {
@@ -588,19 +628,28 @@ print_atomic_lat(const gaspi_rank_t id, struct measurements_t measurements)
     compute_statistics(measurements, &statistics, 0);
     if(options.format == PLAIN)
     {
-      fprintf(stdout, "%-*d%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n", 10,
-              options.iterations, FIELD_WIDTH, FLOAT_PRECISION, statistics.min,
-              FIELD_WIDTH, FLOAT_PRECISION, statistics.max, FIELD_WIDTH,
-              FLOAT_PRECISION, statistics.avg, FIELD_WIDTH, FLOAT_PRECISION,
-              statistics.median, FIELD_WIDTH, FLOAT_PRECISION, statistics.var,
+      fprintf(stdout, "%-*d%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f%*.*f\n",
+              10, options.iterations, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.min,
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.max, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.avg, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.first_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.median, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.third_quartil, 
+              FIELD_WIDTH, FLOAT_PRECISION, statistics.var,
               FIELD_WIDTH, FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == CSV)
     {
-      fprintf(stdout, "%d,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", options.iterations,
-              FLOAT_PRECISION, statistics.min, FLOAT_PRECISION, statistics.max,
-              FLOAT_PRECISION, statistics.avg, FLOAT_PRECISION,
-              statistics.median, FLOAT_PRECISION, statistics.var,
+      fprintf(stdout, "%d,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f,%.*f\n", 
+              options.iterations,
+              FLOAT_PRECISION, statistics.min, 
+              FLOAT_PRECISION, statistics.max,
+              FLOAT_PRECISION, statistics.avg, 
+              FLOAT_PRECISION, statistics.first_quartil, 
+              FLOAT_PRECISION, statistics.median, 
+              FLOAT_PRECISION, statistics.third_quartil, 
+              FLOAT_PRECISION, statistics.var,
               FLOAT_PRECISION, statistics.std);
     }
     else if(options.format == RAW_CSV)

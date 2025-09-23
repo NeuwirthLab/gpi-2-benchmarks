@@ -2,27 +2,26 @@
 #include "stopwatch.h"
 #include "util.h"
 #include "util_memory.h"
+#include <omp.h>
 
 int
 main(int argc, char* argv[])
 {
-  gaspi_rank_t my_id = 0;
-  gaspi_rank_t num_pes;
+  gaspi_rank_t my_id, num_pes;
   size_t size;
   int i, j;
   int bo_ret = OPTIONS_OKAY;
   double time;
-  struct measurements_t measurements;
-
   options.type = ONESIDED;
   options.subtype = BW;
-  options.name = "gbs_read_bw";
-  
+  options.name = "gbs_write_threads_bw";
+
+  struct measurements_t measurements;
+
   bo_ret = benchmark_options(argc, argv);
 
-
-
   init_comm_library(&my_id, &num_pes);
+
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
@@ -39,7 +38,7 @@ main(int argc, char* argv[])
     }
     return EXIT_SUCCESS;
   }
-  
+
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -52,20 +51,20 @@ main(int argc, char* argv[])
   const gaspi_segment_id_t segment_id = 0;
   const gaspi_queue_id_t q_id = 0;
   gaspi_pointer_t ptr;
+
+  print_header(my_id);
+  
   void (*allocate_benchmark_memory)(const gaspi_segment_id_t, const size_t,
                                     const char) =
       options.pin_memory ? allocate_gaspi_memory : allocate_pinned_gaspi_memory;
-  print_header(my_id);
 
   int window_size = options.window_size;
-  int memory_start = 0;
   if(options.single_buffer)
   {
     allocate_benchmark_memory(segment_id,
-                              options.max_message_size * sizeof(char),
+                              options.max_message_size * sizeof(char) * options.num_threads,
                               my_id == 0 ? 'a' : 'b');
     GASPI_CHECK(gaspi_segment_ptr(segment_id, &ptr));
-
   }
 
   for(size = options.min_message_size; size <= options.max_message_size;
@@ -73,10 +72,11 @@ main(int argc, char* argv[])
   {
     if(!options.single_buffer)
     {
-      allocate_benchmark_memory(segment_id, size * window_size * sizeof(char),
+      allocate_benchmark_memory(segment_id, size * window_size * sizeof(char) * options.num_threads,
                                 my_id == 0 ? 'a' : 'b');
       GASPI_CHECK(gaspi_segment_ptr(segment_id, &ptr));
     }
+    //fprintf(stdout, "memory allocated \n"); fflush(stdout);
     if(my_id == 0)
     {
       for(i = 0; i < options.iterations + options.skip; ++i)
@@ -85,27 +85,37 @@ main(int argc, char* argv[])
         {
           time = Wtime();
         }
-        for(j = 0; j < window_size; ++j)
+        #pragma omp parallel num_threads(options.num_threads)
         {
-          GASPI_CHECK(gaspi_read(segment_id, options.single_buffer ? 0 : j * size, 1,
-                                 segment_id, options.single_buffer ? 0 : j * size, size,
-                                 q_id, GASPI_BLOCK));
+          gaspi_queue_id_t q_id = omp_get_thread_num();
+          for(j = 0; j < window_size; ++j)
+          {
+            GASPI_CHECK(gaspi_write(segment_id, options.single_buffer ? omp_get_thread_num() * size : size * omp_get_thread_num() + j * size * omp_get_thread_num(), 1,
+                                    segment_id, options.single_buffer ? omp_get_thread_num() * size : size * omp_get_thread_num() + j * size * omp_get_thread_num(), 
+                                    size, q_id, GASPI_BLOCK));
+          }
+          GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         }
-        GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         if(i >= options.skip)
         {
           measurements.time[i - options.skip] = Wtime() - time;
         }
       }
-      if(options.verify)
+    }
+    if(options.verify)
+    {
+      GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
+    }
+    if(my_id == 1 && options.verify)
+    {
+
+      int limit = options.single_buffer ? size : size * window_size;
+      for(i = 0; i < limit; ++i)
       {
-        for(i = 0; i < (size * window_size); ++i)
+        if(((char*)ptr)[i] != 'a')
         {
-          if(((char*)ptr)[i] != 'b')
-          {
-            fprintf(stderr, "Verification failed. Result is invalid!\n");
-            return EXIT_FAILURE;
-          }
+          fprintf(stderr, "Verification failed. Result is invalid!\n");
+          return EXIT_FAILURE;
         }
       }
     }

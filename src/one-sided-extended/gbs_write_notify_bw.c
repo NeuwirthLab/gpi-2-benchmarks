@@ -99,7 +99,8 @@ main(int argc, char* argv[])
     }
     if(my_id == 1 && options.verify)
     {
-      for(i = 0; i < options.single_buffer ? size : size * window_size; ++i)
+      int limit = options.single_buffer ? size : size * window_size;
+      for(i = 0; i < limit; ++i)
       {
         if(((char*)ptr)[i] != 'a')
         {

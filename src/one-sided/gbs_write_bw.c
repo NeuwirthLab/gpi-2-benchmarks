@@ -87,7 +87,7 @@ main(int argc, char* argv[])
         for(j = 0; j < window_size; ++j)
         {
           GASPI_CHECK(gaspi_write(segment_id, options.single_buffer ? 0 : j * size, 1,
-                                  segment_id,  options.single_buffer ? 0 : j * size, 
+                                  segment_id, options.single_buffer ? 0 : j * size, 
                                   size, q_id, GASPI_BLOCK));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
@@ -102,8 +102,9 @@ main(int argc, char* argv[])
       GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
     }
     if(my_id == 1 && options.verify)
-    {
-      for(i = 0; i < options.single_buffer ? size : size * window_size; ++i)
+    { 
+      int limit = options.single_buffer ? size : size * window_size;
+      for(i = 0; i < limit; ++i)
       {
         if(((char*)ptr)[i] != 'a')
         {
