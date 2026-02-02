@@ -9,17 +9,34 @@ GPI-2 is an API for asynchronous communication, which implements the GASPI speci
 
 
 ## Installation
-Hier beschreiben wie man dies Installiert.
+Hier beschreiben wie man dies Installiert?
 
 ## Usage 
 
 ### 
 Possible arguments are :
-window-size (w)
-help (h)
-min-message-size (s)
-max-message-size (e)
-iterations (i)
-csv (0)
-raw_csv (1)
-verify (v)
+GASPI Micro Benchmark:
+For bandwidth (bw):
+
+         -h [--help]    Display this help message.
+         -w [--window-size] arg  Number of messages sent per iteration. Default 64.
+         -s [--min-message-size] arg     Minimum message size. Default 1 byte.
+         -e [--max-message-size] arg     Maximum message size. Default (1 << 22) byte.
+         -b [--single-buffer]   Use a single memory allocation for the measurements.
+         -v [--verify]  Check results of the performed operation.
+         -i [--iterations] arg  Number of iterations. Default 10.
+         -u [--warmup-iterations] arg   Number of warmup iterations. Default 10.
+         --csv  Print output in csv format with statistics.
+         --raw-csv      Print the collected raw data without statistics.
+
+For latency (lat):
+
+         -h [--help]    Display this help message.
+         -w [--window-size] arg  Number of messages sent per iteration. Default 64.
+         -s [--min-message-size] arg     Minimum message size. Default 1 byte.
+         -e [--max-message-size] arg     Maximum message size. Default (1 << 22) byte.
+         -v [--verify]  Check results of the performed operation.
+         -i [--iterations] arg  Number of iterations. Default 10.
+         -u [--warmup-iterations] arg   Number of warmup iterations. Default 10.
+         --csv  Print output in csv format with statistics.
+         --raw-csv      Print the collected raw data without statistics.
