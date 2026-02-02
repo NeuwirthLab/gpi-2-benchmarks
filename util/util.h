@@ -62,7 +62,9 @@ struct statistics_t
   double min;
   double max;
   double avg;
+  double first_quartil;
   double median;
+  double third_quartil;
   double std;
   double var;
 };
@@ -88,6 +90,7 @@ struct benchmark_options_t
   int verify;
   int gaspi_timer;
   int pin_memory;
+  int num_threads;
 
   size_t min_message_size;
   size_t max_message_size;

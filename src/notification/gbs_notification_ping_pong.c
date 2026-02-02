@@ -7,7 +7,6 @@ int
 main(int argc, char* argv[])
 {
   gaspi_rank_t my_id, num_pes;
-  int i;
   int bo_ret = OPTIONS_OKAY;
   double time;
   struct measurements_t measurements;
@@ -18,17 +17,25 @@ main(int argc, char* argv[])
 
   bo_ret = benchmark_options(argc, argv);
 
+  init_comm_library(&my_id, &num_pes);
+
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
-    print_bad_usage();
+    if (my_id == 0)
+    {
+      print_bad_usage();
+      print_help_message();
+    }
     return EXIT_FAILURE;
   case OPTIONS_HELP:
-    print_help_message();
+    if (my_id == 0)
+    {
+      print_help_message();
+    }
     return EXIT_SUCCESS;
   }
 
-  init_comm_library(&my_id, &num_pes);
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -46,30 +53,32 @@ main(int argc, char* argv[])
   print_header(my_id);
 
   allocate_gaspi_memory(segment_id, sizeof(char), 'a');
-  for(i = 0; i < options.iterations + options.skip; ++i)
+  for(notification_id = 0; notification_id < options.iterations + options.skip; ++notification_id)
   {
     if(my_id == 0)
     {
-      if(i >= options.skip)
+      if(notification_id >= options.skip)
       {
         time = Wtime();
       }
       GASPI_CHECK(
-          gaspi_notify(segment_id, 1, i, notification_val, q_id, GASPI_BLOCK));
-      GASPI_CHECK(gaspi_notify_waitsome(segment_id, i, 1, &notification_id,
+          gaspi_notify(segment_id, 1, notification_id, notification_val, q_id, GASPI_BLOCK));
+      GASPI_CHECK(gaspi_notify_waitsome(segment_id, notification_id, 1, &notification_id,
                                         GASPI_BLOCK));
-      if(i >= options.skip)
+      if(notification_id >= options.skip)
       {
-        measurements.time[i - options.skip] = Wtime() - time;
+        measurements.time[notification_id - options.skip] = Wtime() - time;
       }
     }
     else
     {
-      GASPI_CHECK(gaspi_notify_waitsome(segment_id, i, 1, &notification_id,
+      GASPI_CHECK(gaspi_notify_waitsome(segment_id, notification_id, 1, &notification_id,
                                         GASPI_BLOCK));
-      GASPI_CHECK(gaspi_notify(segment_id, 0, i, my_id, q_id, GASPI_BLOCK));
+      GASPI_CHECK(gaspi_notify(segment_id, 0, notification_id, notification_val, q_id, GASPI_BLOCK));
     }
     GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
+    GASPI_CHECK(gaspi_notify_reset(segment_id, notification_id, &notification_val));
+
   }
   print_notify_lat(my_id, measurements);
   free_gaspi_memory(segment_id);

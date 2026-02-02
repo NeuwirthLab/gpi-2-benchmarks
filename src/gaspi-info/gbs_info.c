@@ -34,11 +34,11 @@ main(int argc, char* argv[])
             "Maximum number of groups: %u\nMaximum number of permissible "
             "segments: %u\nNumber of available Queues: %u\nMaximum number of "
             "simultaneous requests allowed: %u\nMaximum number of allowed "
-            "Queues: %u\nMaximum transfet size for a single request: "
-            "%u\nNumber of available notifications: %u\nMaximum transfer size "
-            "per single passive communication request: %u\nMaximum value for "
-            "atomic value: %u\nAllreduce internal user buffer size: "
-            "%u\nMaximum number of elements allowed in gaspi_allreduce: %u\n",
+            "Queues: %u\nMaximum transfer size for a single request: "
+            "%lu\nNumber of available notifications: %u\nMaximum transfer size "
+            "per single passive communication request: %lu\nMaximum value for "
+            "atomic value: %lu\nAllreduce internal user buffer size: "
+            "%lu\nMaximum number of elements allowed in gaspi_allreduce: %u\n",
             group_max, segment_max, queue_num, queue_size_max, queue_max,
             transfer_size_max, notification_num, passive_transfer_size_max,
             atomic_max_value, allreduce_user_buf_size, allreduce_max_elem);
@@ -46,19 +46,19 @@ main(int argc, char* argv[])
     switch(network)
     {
     case 0:
-      fprintf(stdout, "GASBPI_IB\n");
+      fprintf(stdout, "GASPI_IB\n");
       break;
     case 1:
-      fprintf(stdout, "GASBPI_ROCE\n");
+      fprintf(stdout, "GASPI_ROCE\n");
       break;
     case 2:
-      fprintf(stdout, "GASBPI_ETHERNET\n");
+      fprintf(stdout, "GASPI_ETHERNET\n");
       break;
     case 3:
-      fprintf(stdout, "GASBPI_GEMINI\n");
+      fprintf(stdout, "GASPI_GEMINI\n");
       break;
     case 4:
-      fprintf(stdout, "GASBPI_ARIES\n");
+      fprintf(stdout, "GASPI_ARIES\n");
       break;
     default:
       fprintf(stdout, "Unknown Network Type!\n");

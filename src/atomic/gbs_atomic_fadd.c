@@ -21,17 +21,25 @@ main(int argc, char* argv[])
 
   bo_ret = benchmark_options(argc, argv);
 
+  init_comm_library(&my_id, &num_pes);
+
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
-    print_bad_usage();
+    if (my_id == 0)
+    {
+      print_bad_usage();
+      print_help_message();
+    }
     return EXIT_FAILURE;
   case OPTIONS_HELP:
-    print_help_message();
+    if (my_id == 0)
+    {
+      print_help_message();
+    }
     return EXIT_SUCCESS;
   }
 
-  init_comm_library(&my_id, &num_pes);
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -79,7 +87,7 @@ main(int argc, char* argv[])
 
     if(actual_counter_val != expected_counter_val)
     {
-      fprintf(stderr, "Error: expected result is %d but actual result is %d\n",
+      fprintf(stderr, "Error: expected result is %ld but actual result is %ld\n",
               expected_counter_val, actual_counter_val);
       return EXIT_FAILURE;
     }

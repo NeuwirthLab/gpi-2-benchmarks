@@ -20,17 +20,25 @@ main(int argc, char* argv[])
 
   bo_ret = benchmark_options(argc, argv);
 
+  init_comm_library(&my_id, &num_pes);
+
   switch(bo_ret)
   {
   case OPTIONS_BAD_USAGE:
-    print_bad_usage();
+    if (my_id == 0)
+    {
+      print_bad_usage();
+      print_help_message();
+    }
     return EXIT_FAILURE;
   case OPTIONS_HELP:
-    print_help_message();
+    if (my_id == 0)
+    {
+      print_help_message();
+    }
     return EXIT_SUCCESS;
   }
 
-  init_comm_library(&my_id, &num_pes);
   if(num_pes > 2)
   {
     fprintf(stderr, "Benchmark requires exactly two processes!\n");
@@ -57,95 +65,63 @@ main(int argc, char* argv[])
                               options.max_message_size * sizeof(char),
                               my_id == 0 ? 'a' : 'b');
     GASPI_CHECK(gaspi_segment_ptr(segment_id, &ptr));
-    for(size = options.min_message_size; size <= options.max_message_size;
-        size *= 2)
-    {
-      if(my_id == 0)
-      {
-        for(i = 0; i < options.iterations + options.skip; ++i)
-        {
-          if(i >= options.skip)
-          {
-            time = Wtime();
-          }
-          for(j = 0; j < window_size; ++j)
-          {
-            GASPI_CHECK(gaspi_write(segment_id, 0, 1, segment_id, 0, size, q_id,
-                                    GASPI_BLOCK));
-          }
-          GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
-          if(i >= options.skip)
-          {
-            measurements.time[i - options.skip] = Wtime() - time;
-          }
-        }
-      }
-      if(options.verify)
-      {
-        GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
-      }
-      if(my_id == 1 && options.verify)
-      {
-        for(i = 0; i < size; ++i)
-        {
-          if(((char*)ptr)[i] != 'a')
-          {
-            fprintf(stderr, "Verification failed. Result is invalid!\n");
-            return EXIT_FAILURE;
-          }
-        }
-      }
-      print_result(my_id, measurements, size);
-    }
-    free_gaspi_memory(segment_id);
   }
-  else
+
+  for(size = options.min_message_size; size <= options.max_message_size;
+      size *= 2)
   {
-    for(size = options.min_message_size; size <= options.max_message_size;
-        size *= 2)
+    if(!options.single_buffer)
     {
       allocate_benchmark_memory(segment_id, size * window_size * sizeof(char),
                                 my_id == 0 ? 'a' : 'b');
       GASPI_CHECK(gaspi_segment_ptr(segment_id, &ptr));
-      if(my_id == 0)
+    }
+    if(my_id == 0)
+    {
+      for(i = 0; i < options.iterations + options.skip; ++i)
       {
-        for(i = 0; i < options.iterations + options.skip; ++i)
+        if(i >= options.skip)
         {
-          if(i >= options.skip)
-          {
-            time = Wtime();
-          }
-          for(j = 0; j < window_size; ++j)
-          {
-            GASPI_CHECK(gaspi_write(segment_id, j * size, 1, segment_id,
-                                    j * size, size, q_id, GASPI_BLOCK));
-          }
-          GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
-          if(i >= options.skip)
-          {
-            measurements.time[i - options.skip] = Wtime();
-          }
+          time = Wtime();
+        }
+        for(j = 0; j < window_size; ++j)
+        {
+          GASPI_CHECK(gaspi_write(segment_id, options.single_buffer ? 0 : j * size, 1,
+                                  segment_id, options.single_buffer ? 0 : j * size, 
+                                  size, q_id, GASPI_BLOCK));
+        }
+        GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
+        if(i >= options.skip)
+        {
+          measurements.time[i - options.skip] = Wtime() - time;
         }
       }
-      if(options.verify)
+    }
+    if(options.verify)
+    {
+      GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
+    }
+    if(my_id == 1 && options.verify)
+    { 
+      int limit = options.single_buffer ? size : size * window_size;
+      for(i = 0; i < limit; ++i)
       {
-        GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
-      }
-      if(my_id == 1 && options.verify)
-      {
-        for(i = 0; i < size * window_size; ++i)
+        if(((char*)ptr)[i] != 'a')
         {
-          if(((char*)ptr)[i] != 'a')
-          {
-            fprintf(stderr, "Verification failed. Result is invalid!\n");
-            return EXIT_FAILURE;
-          }
+          fprintf(stderr, "Verification failed. Result is invalid!\n");
+          return EXIT_FAILURE;
         }
       }
-
-      print_result(my_id, measurements, size);
+    }
+    print_result(my_id, measurements, size);
+    if(!options.single_buffer)
+    {
       free_gaspi_memory(segment_id);
     }
+  }
+  if(options.single_buffer)
+  {
+    free_gaspi_memory(segment_id);
   }
   free(measurements.time);
   finalize_comm_library();
