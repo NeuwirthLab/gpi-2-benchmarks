@@ -1,4 +1,4 @@
-# Dokumentation for GPI-Benchmarks
+# Documentation for GPI-Benchmarks
 
 ## Introduction
 
