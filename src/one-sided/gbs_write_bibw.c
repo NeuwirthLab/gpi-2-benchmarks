@@ -94,7 +94,7 @@ main(int argc, char* argv[])
         {
           GASPI_CHECK(gaspi_write(segment_id_send, options.single_buffer ? 0 : j * size, 1, 
                                   segment_id_recv, options.single_buffer ? 0 : j * size,
-                                  size, q_id, GASPI_BLOCK));
+                                  size, q_id, GASPI_TEST));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));
@@ -112,7 +112,7 @@ main(int argc, char* argv[])
         {
           GASPI_CHECK(gaspi_write(segment_id_send, options.single_buffer ? 0 : j * size, 0,
                                   segment_id_recv, options.single_buffer ? 0 : j * size,
-                                  size, q_id, GASPI_BLOCK));
+                                  size, q_id, GASPI_TEST));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         GASPI_CHECK(gaspi_barrier(GASPI_GROUP_ALL, GASPI_BLOCK));

@@ -22,7 +22,7 @@ function(settings target)
 	  ${target} PRIVATE "${CMAKE_SOURCE_DIR}/util"
 	)
 	target_compile_features(${target} PRIVATE c_std_11)
-	target_compile_definitions(${target} PRIVATE "$<$<BOOL:${WITH_MPI}>:USE_MPI>")
+	target_compile_definitions(${target} PRIVATE "$<$<BOOL:${WITH_MPI}>:WITH_MPI>")
 endfunction()
 
 set(SRCS "src/notification/gbs_write_notification_ping_pong_bw.c" "src/threaded/gbs_write_threads_bw.c" "src/threaded/gbs_read_threads_bw.c" "src/atomic/gbs_atomic_fadd.c" "src/atomic/gbs_atomic_cas.c" "src/collective/gbs_allreduce.c" "src/collective/gbs_barrier.c" "src/gaspi-info/gbs_info.c" "src/notification/gbs_write_notification_ping_pong_lat.c" "src/notification/gbs_notification_ping_pong.c" "src/one-sided/gbs_read_bw.c" "src/one-sided/gbs_read_lat.c" "src/one-sided/gbs_write_bw.c" "src/one-sided/gbs_write_lat.c" "src/one-sided/gbs_write_bibw.c" "src/one-sided-extended/gbs_read_notify_bw.c" "src/one-sided-extended/gbs_read_notify_lat.c" "src/one-sided-extended/gbs_write_notify_bw.c" "src/one-sided-extended/gbs_write_notify_lat.c" "src/one-sided-extended/gbs_write_notify_bibw.c" "src/passive/gbs_passive_bw.c" "src/passive/gbs_passive_lat.c")

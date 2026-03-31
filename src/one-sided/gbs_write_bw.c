@@ -88,7 +88,7 @@ main(int argc, char* argv[])
         {
           GASPI_CHECK(gaspi_write(segment_id, options.single_buffer ? 0 : j * size, 1,
                                   segment_id, options.single_buffer ? 0 : j * size, 
-                                  size, q_id, GASPI_BLOCK));
+                                  size, q_id, GASPI_TEST));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         if(i >= options.skip)

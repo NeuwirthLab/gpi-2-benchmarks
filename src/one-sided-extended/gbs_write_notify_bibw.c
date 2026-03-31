@@ -97,7 +97,7 @@ main(int argc, char* argv[])
           GASPI_CHECK(gaspi_write_notify(
               segment_id_send, options.single_buffer ? 0 : j * size, 1,
               segment_id_recv, options.single_buffer ? 0 : j * size, size,
-              notification_id + j, notification_val, q_id, GASPI_BLOCK));
+              notification_id + j, notification_val, q_id, GASPI_TEST));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         GASPI_CHECK(gaspi_notify_waitsome(segment_id_recv, notification_id,
@@ -118,7 +118,7 @@ main(int argc, char* argv[])
           GASPI_CHECK(gaspi_write_notify(
               segment_id_send, options.single_buffer ? 0 : j * size, 0, 
               segment_id_recv, options.single_buffer ? 0 : j * size, size,
-              notification_id + j, notification_val, q_id, GASPI_BLOCK));
+              notification_id + j, notification_val, q_id, GASPI_TEST));
         }
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         GASPI_CHECK(gaspi_notify_waitsome(segment_id_recv, notification_id,

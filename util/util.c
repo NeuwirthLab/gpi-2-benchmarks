@@ -17,8 +17,7 @@ init_comm_library(gaspi_rank_t* const my_id, gaspi_rank_t* const num_ids)
 {
 #ifdef WITH_MPI
   int rc = -1;
-  MPI_Init(NULL, NULL);
-  if(MPI_SUCCESS != rc)
+  if((rc = MPI_Init(NULL,NULL)) != MPI_SUCCESS)
   {
     fprintf(stderr, "MPI_Init failed with %i\n", rc);
     exit(EXIT_FAILURE);
@@ -34,8 +33,7 @@ finalize_comm_library()
 {
 #ifdef WITH_MPI
   int rc = -1;
-  MPI_Finalize();
-  if(MPI_SUCCESS != rc)
+  if((rc = MPI_Finalize()) != MPI_SUCCESS)
   {
     fprintf(stderr, "MPI_Finalize failed with %i", rc);
     exit(EXIT_FAILURE);
@@ -390,8 +388,7 @@ compute_statistics(struct measurements_t measurements,
   {
     for(i = 0; i < n; ++i)
     {
-      t[i] = (double)size / t[i];
-      t[i] *= 1e3; // MB/s
+      t[i] = (double)size / t[i]; // bytes / time [us] => MB/s
     }
   }
   else if(options.type == NOTIFY && options.subtype == RATE)
@@ -399,14 +396,6 @@ compute_statistics(struct measurements_t measurements,
     for(i = 0; i < n; ++i)
     {
       t[i] = options.window_size / (t[i] * 1e-9);
-    }
-  }
-  else if(options.subtype == LAT || options.type == COLLECTIVE ||
-          options.subtype == PINGPONG || options.subtype == STRIDED)
-  {
-    for(i = 0; i < n; ++i)
-    {
-      t[i] *= 1e-3; // ns to us
     }
   }
 

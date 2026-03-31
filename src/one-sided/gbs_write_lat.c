@@ -81,7 +81,7 @@ main(int argc, char* argv[])
           time = Wtime();
         }
         GASPI_CHECK(gaspi_write(segment_id, 0, 1, segment_id, 0, size, q_id,
-                                GASPI_BLOCK));
+                                GASPI_TEST));
         GASPI_CHECK(gaspi_wait(q_id, GASPI_BLOCK));
         if(i >= options.skip)
         {
